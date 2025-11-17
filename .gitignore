@@ -78,3 +78,5 @@ vrs_index_*
 *.zs.streams.*
 benchresult.bin*
 tmp*
+
+data/

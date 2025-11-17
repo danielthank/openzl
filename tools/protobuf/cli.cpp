@@ -15,21 +15,16 @@
 #include "tools/io/OutputFile.h"
 #include "tools/protobuf/ProtoDeserializer.h"
 #include "tools/protobuf/ProtoSerializer.h"
-#ifdef OPENZL_BUCK_BUILD
-#    include "data_compression/experimental/zstrong/tools/protobuf/schema.pb.h"
-#else
-#    include "tools/protobuf/schema.pb.h"
-#endif
+#include "tools/protobuf/schema_otlp.pb.h"
+#include "tools/protobuf/schema_otap.pb.h"
 #include "tools/training/train.h"
 #include "tools/training/train_params.h"
 
 namespace openzl {
 namespace protobuf {
-namespace {
-using MessageDifferencer = google::protobuf::util::MessageDifferencer;
-using JsonPrintOptions   = google::protobuf::util::JsonPrintOptions;
-using JsonParseOptions   = google::protobuf::util::JsonParseOptions;
-using nano               = std::chrono::nanoseconds;
+
+using OtlpSchema = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
+using OtapSchema = opentelemetry::proto::experimental::arrow::v1::BatchArrowRecords;
 
 std::string kInput      = "input";
 std::string kOutput     = "output";
@@ -38,6 +33,7 @@ std::string kOutputType = "output-protocol";
 std::string kCheck      = "check";
 std::string kNumIters   = "num-iters";
 std::string kCompressor = "compressor";
+std::string kMode       = "mode";
 
 enum Cmd : int {
     UNSPECIFIED = 0,
@@ -51,6 +47,12 @@ enum Protocol {
     ZL    = 1,
     JSON  = 2,
 };
+
+namespace {
+using MessageDifferencer = google::protobuf::util::MessageDifferencer;
+using JsonPrintOptions   = google::protobuf::util::JsonPrintOptions;
+using JsonParseOptions   = google::protobuf::util::JsonParseOptions;
+using nano               = std::chrono::nanoseconds;
 
 Protocol parseProtocol(const std::string& protocol)
 {
@@ -91,6 +93,7 @@ std::string ext(Protocol protocol)
     throw std::runtime_error("Invalid protocol!");
 }
 
+template<typename Schema>
 std::string
 serialize(const Schema& obj, Protocol protocol, ProtoSerializer& serializer)
 {
@@ -110,6 +113,7 @@ serialize(const Schema& obj, Protocol protocol, ProtoSerializer& serializer)
     return serialized;
 }
 
+template<typename Schema>
 Schema deserialize(
         const std::string& serialized,
         Protocol protocol,
@@ -227,6 +231,7 @@ void updateResults(
     std::cout << std::flush;
 }
 
+template<typename Schema>
 int handleBenchmark(BenchmarkArgs args)
 {
     std::array<size_t, 2> serialized_size = { 0, 0 };
@@ -238,13 +243,13 @@ int handleBenchmark(BenchmarkArgs args)
         total_inputs++;
         // Deserialize object with the input protocol
         const auto contents = std::string(input->contents());
-        auto obj = deserialize(contents, args.inputType, args.deserializer);
+        auto obj = deserialize<Schema>(contents, args.inputType, args.deserializer);
         for (auto protocol : { Protocol::Proto, Protocol::ZL }) {
             // Get the serialized size of the object with the chosen
             // protocol
-            auto serialized = serialize(obj, protocol, args.serializer);
+            auto serialized = serialize<Schema>(obj, protocol, args.serializer);
             auto deserialized =
-                    deserialize(serialized, protocol, args.deserializer);
+                    deserialize<Schema>(serialized, protocol, args.deserializer);
             serialized_size[protocol] += serialized.size();
 
             // Check if the round trip is correct
@@ -255,12 +260,12 @@ int handleBenchmark(BenchmarkArgs args)
             // Benchmark serialization and deserialization speeds
             const auto serialization_start = std::chrono::steady_clock::now();
             for (size_t n = 0; n < args.numIters; ++n) {
-                auto val = serialize(deserialized, protocol, args.serializer);
+                auto val = serialize<Schema>(deserialized, protocol, args.serializer);
             }
             const auto serialization_end     = std::chrono::steady_clock::now();
             const auto deserialization_start = std::chrono::steady_clock::now();
             for (size_t n = 0; n < args.numIters; ++n) {
-                auto val = deserialize(serialized, protocol, args.deserializer);
+                auto val = deserialize<Schema>(serialized, protocol, args.deserializer);
             }
             const auto deserialization_end = std::chrono::steady_clock::now();
             cdur[protocol] += serialization_end - serialization_start;
@@ -276,6 +281,7 @@ int handleBenchmark(BenchmarkArgs args)
     return 0;
 }
 
+template<typename Schema>
 int handleSerialize(SerializeArgs args)
 {
     for (auto& input : *args.inputs) {
@@ -283,14 +289,14 @@ int handleSerialize(SerializeArgs args)
 
         // Deserialize and serialize the protobuf object with the chosen
         // protocol
-        auto obj = deserialize(contents, args.inputType, args.deserializer);
-        auto serialized = serialize(obj, args.outputType, args.serializer);
+        auto obj = deserialize<Schema>(contents, args.inputType, args.deserializer);
+        auto serialized = serialize<Schema>(obj, args.outputType, args.serializer);
         ZL_LOG(ALWAYS, "Serialized to %d bytes!", serialized.size());
 
         // Check if the round trip is correct
         if (args.check) {
             auto deserialized =
-                    deserialize(serialized, args.outputType, args.deserializer);
+                    deserialize<Schema>(serialized, args.outputType, args.deserializer);
             ZL_REQUIRE(
                     MessageDifferencer::Equivalent(obj, deserialized),
                     "Round trip check failed!");
@@ -310,13 +316,14 @@ int handleSerialize(SerializeArgs args)
     return 0;
 }
 
+template<typename Schema>
 int handleTrain(TrainArgs args)
 {
     std::vector<Schema> schemas;
     for (auto& input : *args.inputs) {
         const auto contents = std::string(input->contents());
         schemas.emplace_back(
-                deserialize(contents, args.inputType, args.deserializer));
+                deserialize<Schema>(contents, args.inputType, args.deserializer));
     }
 
     std::vector<training::MultiInput> samples(schemas.size());
@@ -365,6 +372,11 @@ int main(int argc, char** argv)
             'c',
             true,
             "An optional compressor to use for the ZL protocol.");
+    parser.addGlobalFlag(
+            kMode,
+            'm',
+            true,
+            "Schema mode to use. Must be one of: otlp, otap");
 
     // serialize
     parser.addCommand(Cmd::SERIALIZE, "serialize", 's');
@@ -403,19 +415,48 @@ int main(int argc, char** argv)
 
     auto args = parser.parse(argc, argv);
 
-    switch (args.chosenCmd()) {
-        case Cmd::SERIALIZE: {
-            return openzl::protobuf::handleSerialize(SerializeArgs(args));
+    if (!args.globalHasFlag(kMode)) {
+        ZL_LOG(ALWAYS, "Error: --mode flag is required. Must be one of: otlp, otap");
+        return 1;
+    }
+
+    std::string mode = args.globalRequiredFlag(kMode);
+    if (mode != "otlp" && mode != "otap") {
+        ZL_LOG(ALWAYS, "Error: Invalid mode '%s'. Must be one of: otlp, otap", mode.c_str());
+        return 1;
+    }
+
+    if (mode == "otlp") {
+        switch (args.chosenCmd()) {
+            case Cmd::SERIALIZE: {
+                return handleSerialize<OtlpSchema>(SerializeArgs(args));
+            }
+            case Cmd::BENCHMARK: {
+                return handleBenchmark<OtlpSchema>(BenchmarkArgs(args));
+            }
+            case Cmd::TRAIN: {
+                return handleTrain<OtlpSchema>(TrainArgs(args));
+            }
+            default: {
+                ZL_LOG(ALWAYS, "No command specified!");
+                return 1;
+            }
         }
-        case Cmd::BENCHMARK: {
-            return openzl::protobuf::handleBenchmark(BenchmarkArgs(args));
-        }
-        case Cmd::TRAIN: {
-            return openzl::protobuf::handleTrain(TrainArgs(args));
-        }
-        default: {
-            ZL_LOG(ALWAYS, "No command specified!");
-            return 1;
+    } else { // mode == "otap"
+        switch (args.chosenCmd()) {
+            case Cmd::SERIALIZE: {
+                return handleSerialize<OtapSchema>(SerializeArgs(args));
+            }
+            case Cmd::BENCHMARK: {
+                return handleBenchmark<OtapSchema>(BenchmarkArgs(args));
+            }
+            case Cmd::TRAIN: {
+                return handleTrain<OtapSchema>(TrainArgs(args));
+            }
+            default: {
+                ZL_LOG(ALWAYS, "No command specified!");
+                return 1;
+            }
         }
     }
 

@@ -37,7 +37,8 @@ if (OPENZL_BUILD_PROTOBUF_TOOLS)
     # Make the protobuf_cli tool
     file(GLOB protobuf_cli_sources CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/cli.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/schema.proto")
+        "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlp.proto"
+        "${CMAKE_CURRENT_SOURCE_DIR}/schema_otap.proto")
     add_executable(protobuf_cli ${protobuf_cli_sources})
 
     include(FindProtobuf)
@@ -48,6 +49,7 @@ if (OPENZL_BUILD_PROTOBUF_TOOLS)
         arg
         tools_io
         tools_training
+        custom_parsers
     )
     target_include_directories(protobuf_cli PRIVATE ${PROJECT_BINARY_DIR})
 
