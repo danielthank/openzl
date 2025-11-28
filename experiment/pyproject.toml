@@ -1,0 +1,6 @@
+[project]
+name = "openzl-training"
+version = "0.1.0"
+description = "Training tool for OpenZL compressors"
+requires-python = ">=3.11"
+dependencies = []

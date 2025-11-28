@@ -15,7 +15,8 @@
 #include "tools/io/OutputFile.h"
 #include "tools/protobuf/ProtoDeserializer.h"
 #include "tools/protobuf/ProtoSerializer.h"
-#include "tools/protobuf/schema_otlp.pb.h"
+#include "tools/protobuf/schema_otlp_metrics.pb.h"
+#include "tools/protobuf/schema_otlp_traces.pb.h"
 #include "tools/protobuf/schema_otap.pb.h"
 #include "tools/training/train.h"
 #include "tools/training/train_params.h"
@@ -23,7 +24,8 @@
 namespace openzl {
 namespace protobuf {
 
-using OtlpSchema = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
+using OtlpMetricsSchema = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
+using OtlpTracesSchema = opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 using OtapSchema = opentelemetry::proto::experimental::arrow::v1::BatchArrowRecords;
 
 std::string kInput      = "input";
@@ -376,7 +378,7 @@ int main(int argc, char** argv)
             kMode,
             'm',
             true,
-            "Schema mode to use. Must be one of: otlp, otap");
+            "Schema mode to use. Must be one of: otlp_metrics, otlp_traces, otap");
 
     // serialize
     parser.addCommand(Cmd::SERIALIZE, "serialize", 's');
@@ -416,26 +418,42 @@ int main(int argc, char** argv)
     auto args = parser.parse(argc, argv);
 
     if (!args.globalHasFlag(kMode)) {
-        ZL_LOG(ALWAYS, "Error: --mode flag is required. Must be one of: otlp, otap");
+        ZL_LOG(ALWAYS, "Error: --mode flag is required. Must be one of: otlp_metrics, otlp_traces, otap");
         return 1;
     }
 
     std::string mode = args.globalRequiredFlag(kMode);
-    if (mode != "otlp" && mode != "otap") {
-        ZL_LOG(ALWAYS, "Error: Invalid mode '%s'. Must be one of: otlp, otap", mode.c_str());
+    if (mode != "otlp_metrics" && mode != "otlp_traces" && mode != "otap") {
+        ZL_LOG(ALWAYS, "Error: Invalid mode '%s'. Must be one of: otlp_metrics, otlp_traces, otap", mode.c_str());
         return 1;
     }
 
-    if (mode == "otlp") {
+    if (mode == "otlp_metrics") {
         switch (args.chosenCmd()) {
             case Cmd::SERIALIZE: {
-                return handleSerialize<OtlpSchema>(SerializeArgs(args));
+                return handleSerialize<OtlpMetricsSchema>(SerializeArgs(args));
             }
             case Cmd::BENCHMARK: {
-                return handleBenchmark<OtlpSchema>(BenchmarkArgs(args));
+                return handleBenchmark<OtlpMetricsSchema>(BenchmarkArgs(args));
             }
             case Cmd::TRAIN: {
-                return handleTrain<OtlpSchema>(TrainArgs(args));
+                return handleTrain<OtlpMetricsSchema>(TrainArgs(args));
+            }
+            default: {
+                ZL_LOG(ALWAYS, "No command specified!");
+                return 1;
+            }
+        }
+    } else if (mode == "otlp_traces") {
+        switch (args.chosenCmd()) {
+            case Cmd::SERIALIZE: {
+                return handleSerialize<OtlpTracesSchema>(SerializeArgs(args));
+            }
+            case Cmd::BENCHMARK: {
+                return handleBenchmark<OtlpTracesSchema>(BenchmarkArgs(args));
+            }
+            case Cmd::TRAIN: {
+                return handleTrain<OtlpTracesSchema>(TrainArgs(args));
             }
             default: {
                 ZL_LOG(ALWAYS, "No command specified!");

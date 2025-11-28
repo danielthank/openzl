@@ -37,7 +37,8 @@ if (OPENZL_BUILD_PROTOBUF_TOOLS)
     # Make the protobuf_cli tool
     file(GLOB protobuf_cli_sources CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/cli.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlp.proto"
+        "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlp_metrics.proto"
+        "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlp_traces.proto"
         "${CMAKE_CURRENT_SOURCE_DIR}/schema_otap.proto")
     add_executable(protobuf_cli ${protobuf_cli_sources})
 
