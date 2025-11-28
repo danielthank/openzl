@@ -4,6 +4,8 @@ if (OPENZL_BUILD_PROTOBUF_TOOLS)
     set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(protobuf_WITH_ZLIB_DEFAULT OFF CACHE BOOL "" FORCE)
     set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    # Enable position-independent code for static linking into shared libs/PIE executables
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
     # Get the protobuf library
     FetchContent_Declare(protobuf
@@ -27,11 +29,22 @@ if (OPENZL_BUILD_PROTOBUF_TOOLS)
     list(REMOVE_ITEM protobuf_serializer_sources "${CMAKE_CURRENT_SOURCE_DIR}/cli.cpp")
 
     add_library(protobuf_serializer ${protobuf_serializer_sources})
+    set_target_properties(protobuf_serializer PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+    # Generate protobuf files for the serializer library
+    include(FindProtobuf)
+    protobuf_generate(TARGET protobuf_serializer
+        PROTOS
+            "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlp_metrics.proto"
+            "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlp_traces.proto"
+            "${CMAKE_CURRENT_SOURCE_DIR}/schema_otap.proto"
+    )
 
     target_link_libraries(protobuf_serializer PUBLIC
         openzl_cpp
         protobuf::libprotobuf
     )
+    target_include_directories(protobuf_serializer PUBLIC ${PROJECT_BINARY_DIR})
     apply_openzl_compile_options_to_target(protobuf_serializer)
 
     # Make the protobuf_cli tool
