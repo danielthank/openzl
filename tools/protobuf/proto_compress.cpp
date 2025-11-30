@@ -5,6 +5,7 @@
 #include "tools/protobuf/schema_otlp_metrics.pb.h"
 #include "tools/protobuf/schema_otlp_traces.pb.h"
 #include "tools/protobuf/schema_otap.pb.h"
+#include "tools/protobuf/schema_tpch.pb.h"
 #include <cstring>
 #include <string>
 
@@ -14,6 +15,7 @@ using OtlpTraces =
     opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 using Otap =
     opentelemetry::proto::experimental::arrow::v1::BatchArrowRecords;
+using TpchBatch = tpch::TpchBatch;
 
 // Thread-local storage for last error message
 static thread_local std::string g_last_error;
@@ -175,6 +177,37 @@ size_t ZL_ProtoSerializer_compressOtap(
     }
 }
 
+size_t ZL_ProtoSerializer_compressTpch(
+    ZL_ProtoSerializer* serializer,
+    void* dst,
+    size_t dst_capacity,
+    const void* src,
+    size_t src_len)
+{
+    try {
+        g_last_error.clear();
+        TpchBatch message;
+        if (!message.ParseFromArray(src, src_len)) {
+            g_last_error = "Failed to parse TpchBatch proto";
+            return 0;
+        }
+        std::string compressed = serializer->serializer.serialize(message);
+        if (compressed.size() > dst_capacity) {
+            g_last_error = "Buffer too small: need " + std::to_string(compressed.size()) +
+                           " bytes, have " + std::to_string(dst_capacity);
+            return 0;
+        }
+        memcpy(dst, compressed.data(), compressed.size());
+        return compressed.size();
+    } catch (const std::exception& e) {
+        g_last_error = e.what();
+        return 0;
+    } catch (...) {
+        g_last_error = "Unknown exception compressing TpchBatch";
+        return 0;
+    }
+}
+
 // ============ Deserializer ============
 
 ZL_ProtoDeserializer* ZL_ProtoDeserializer_create()
@@ -286,6 +319,36 @@ size_t ZL_ProtoDeserializer_decompressOtap(
     }
 }
 
+size_t ZL_ProtoDeserializer_decompressTpch(
+    ZL_ProtoDeserializer* deserializer,
+    void* dst,
+    size_t dst_capacity,
+    const void* src,
+    size_t src_len)
+{
+    try {
+        g_last_error.clear();
+        std::string compressed(static_cast<const char*>(src), src_len);
+        TpchBatch message;
+        deserializer->deserializer.deserialize(compressed, message);
+
+        std::string proto_bytes = message.SerializeAsString();
+        if (proto_bytes.size() > dst_capacity) {
+            g_last_error = "Buffer too small: need " + std::to_string(proto_bytes.size()) +
+                           " bytes, have " + std::to_string(dst_capacity);
+            return 0;
+        }
+        memcpy(dst, proto_bytes.data(), proto_bytes.size());
+        return proto_bytes.size();
+    } catch (const std::exception& e) {
+        g_last_error = e.what();
+        return 0;
+    } catch (...) {
+        g_last_error = "Unknown exception decompressing TpchBatch";
+        return 0;
+    }
+}
+
 // ============ Message Comparison ============
 
 int ZL_Proto_compareOtlpMetrics(
@@ -366,6 +429,33 @@ int ZL_Proto_compareOtap(
         return 0;
     } catch (...) {
         g_last_error = "Unknown exception comparing Otap";
+        return 0;
+    }
+}
+
+int ZL_Proto_compareTpch(
+    const void* proto1,
+    size_t proto1_len,
+    const void* proto2,
+    size_t proto2_len)
+{
+    try {
+        g_last_error.clear();
+        TpchBatch msg1, msg2;
+        if (!msg1.ParseFromArray(proto1, proto1_len)) {
+            g_last_error = "Failed to parse first TpchBatch proto";
+            return 0;
+        }
+        if (!msg2.ParseFromArray(proto2, proto2_len)) {
+            g_last_error = "Failed to parse second TpchBatch proto";
+            return 0;
+        }
+        return msg1.SerializeAsString() == msg2.SerializeAsString() ? 1 : 0;
+    } catch (const std::exception& e) {
+        g_last_error = e.what();
+        return 0;
+    } catch (...) {
+        g_last_error = "Unknown exception comparing TpchBatch";
         return 0;
     }
 }

@@ -18,6 +18,7 @@
 #include "tools/protobuf/schema_otlp_metrics.pb.h"
 #include "tools/protobuf/schema_otlp_traces.pb.h"
 #include "tools/protobuf/schema_otap.pb.h"
+#include "tools/protobuf/schema_tpch.pb.h"
 #include "tools/training/train.h"
 #include "tools/training/train_params.h"
 
@@ -27,6 +28,7 @@ namespace protobuf {
 using OtlpMetricsSchema = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
 using OtlpTracesSchema = opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 using OtapSchema = opentelemetry::proto::experimental::arrow::v1::BatchArrowRecords;
+using TpchSchema = tpch::TpchBatch;
 
 std::string kInput      = "input";
 std::string kOutput     = "output";
@@ -378,7 +380,7 @@ int main(int argc, char** argv)
             kMode,
             'm',
             true,
-            "Schema mode to use. Must be one of: otlp_metrics, otlp_traces, otap");
+            "Schema mode to use. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto");
 
     // serialize
     parser.addCommand(Cmd::SERIALIZE, "serialize", 's');
@@ -418,13 +420,13 @@ int main(int argc, char** argv)
     auto args = parser.parse(argc, argv);
 
     if (!args.globalHasFlag(kMode)) {
-        ZL_LOG(ALWAYS, "Error: --mode flag is required. Must be one of: otlp_metrics, otlp_traces, otap");
+        ZL_LOG(ALWAYS, "Error: --mode flag is required. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto");
         return 1;
     }
 
     std::string mode = args.globalRequiredFlag(kMode);
-    if (mode != "otlp_metrics" && mode != "otlp_traces" && mode != "otap") {
-        ZL_LOG(ALWAYS, "Error: Invalid mode '%s'. Must be one of: otlp_metrics, otlp_traces, otap", mode.c_str());
+    if (mode != "otlp_metrics" && mode != "otlp_traces" && mode != "otap" && mode != "tpch_proto") {
+        ZL_LOG(ALWAYS, "Error: Invalid mode '%s'. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto", mode.c_str());
         return 1;
     }
 
@@ -460,7 +462,7 @@ int main(int argc, char** argv)
                 return 1;
             }
         }
-    } else { // mode == "otap"
+    } else if (mode == "otap") {
         switch (args.chosenCmd()) {
             case Cmd::SERIALIZE: {
                 return handleSerialize<OtapSchema>(SerializeArgs(args));
@@ -470,6 +472,22 @@ int main(int argc, char** argv)
             }
             case Cmd::TRAIN: {
                 return handleTrain<OtapSchema>(TrainArgs(args));
+            }
+            default: {
+                ZL_LOG(ALWAYS, "No command specified!");
+                return 1;
+            }
+        }
+    } else { // mode == "tpch_proto"
+        switch (args.chosenCmd()) {
+            case Cmd::SERIALIZE: {
+                return handleSerialize<TpchSchema>(SerializeArgs(args));
+            }
+            case Cmd::BENCHMARK: {
+                return handleBenchmark<TpchSchema>(BenchmarkArgs(args));
+            }
+            case Cmd::TRAIN: {
+                return handleTrain<TpchSchema>(TrainArgs(args));
             }
             default: {
                 ZL_LOG(ALWAYS, "No command specified!");
