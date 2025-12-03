@@ -18,6 +18,7 @@ typedef enum {
     ZL_PROTO_SCHEMA_OTAP = 2,
     ZL_PROTO_SCHEMA_TPCH = 3,
     ZL_PROTO_SCHEMA_OTLP_METRICS_DICT = 4,
+    ZL_PROTO_SCHEMA_OTLP_TRACES_DICT = 5,
 } ZL_ProtoSchema;
 
 // ============ Error Handling ============

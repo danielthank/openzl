@@ -7,6 +7,7 @@
 #include "tools/protobuf/schema_otap.pb.h"
 #include "tools/protobuf/schema_tpch.pb.h"
 #include "tools/protobuf/schema_otlpmetricsdict.pb.h"
+#include "tools/protobuf/schema_otlptracesdict.pb.h"
 #include <cstring>
 #include <string>
 
@@ -17,7 +18,8 @@ using OtlpTraces =
 using Otap =
     opentelemetry::proto::experimental::arrow::v1::BatchArrowRecords;
 using TpchBatch = tpch::TpchBatch;
-using OtlpMetricsDict = otlpdict::MetricsDictBatch;
+using OtlpMetricsDict = otlpmetricsdict::MetricsDictBatch;
+using OtlpTracesDict = otlptracesdict::TracesDictBatch;
 
 // Thread-local storage for last error message
 static thread_local std::string g_last_error;
@@ -176,6 +178,8 @@ size_t ZL_ProtoSerializer_compress(
                 return compressImpl<TpchBatch>(serializer, dst, dst_capacity, src, src_len, "TpchBatch");
             case ZL_PROTO_SCHEMA_OTLP_METRICS_DICT:
                 return compressImpl<OtlpMetricsDict>(serializer, dst, dst_capacity, src, src_len, "OtlpMetricsDict");
+            case ZL_PROTO_SCHEMA_OTLP_TRACES_DICT:
+                return compressImpl<OtlpTracesDict>(serializer, dst, dst_capacity, src, src_len, "OtlpTracesDict");
             default:
                 g_last_error = "Unknown schema: " + std::to_string(static_cast<int>(schema));
                 return 0;
@@ -231,6 +235,8 @@ size_t ZL_ProtoDeserializer_decompress(
                 return decompressImpl<TpchBatch>(deserializer, dst, dst_capacity, src, src_len, "TpchBatch");
             case ZL_PROTO_SCHEMA_OTLP_METRICS_DICT:
                 return decompressImpl<OtlpMetricsDict>(deserializer, dst, dst_capacity, src, src_len, "OtlpMetricsDict");
+            case ZL_PROTO_SCHEMA_OTLP_TRACES_DICT:
+                return decompressImpl<OtlpTracesDict>(deserializer, dst, dst_capacity, src, src_len, "OtlpTracesDict");
             default:
                 g_last_error = "Unknown schema: " + std::to_string(static_cast<int>(schema));
                 return 0;
@@ -266,6 +272,8 @@ int ZL_Proto_compare(
                 return compareImpl<TpchBatch>(proto1, proto1_len, proto2, proto2_len, "TpchBatch");
             case ZL_PROTO_SCHEMA_OTLP_METRICS_DICT:
                 return compareImpl<OtlpMetricsDict>(proto1, proto1_len, proto2, proto2_len, "OtlpMetricsDict");
+            case ZL_PROTO_SCHEMA_OTLP_TRACES_DICT:
+                return compareImpl<OtlpTracesDict>(proto1, proto1_len, proto2, proto2_len, "OtlpTracesDict");
             default:
                 g_last_error = "Unknown schema: " + std::to_string(static_cast<int>(schema));
                 return 0;

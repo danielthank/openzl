@@ -20,6 +20,7 @@
 #include "tools/protobuf/schema_otap.pb.h"
 #include "tools/protobuf/schema_tpch.pb.h"
 #include "tools/protobuf/schema_otlpmetricsdict.pb.h"
+#include "tools/protobuf/schema_otlptracesdict.pb.h"
 #include "tools/training/train.h"
 #include "tools/training/train_params.h"
 
@@ -30,7 +31,8 @@ using OtlpMetricsSchema = opentelemetry::proto::collector::metrics::v1::ExportMe
 using OtlpTracesSchema = opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 using OtapSchema = opentelemetry::proto::experimental::arrow::v1::BatchArrowRecords;
 using TpchSchema = tpch::TpchBatch;
-using OtlpMetricsDictSchema = otlpdict::MetricsDictBatch;
+using OtlpMetricsDictSchema = otlpmetricsdict::MetricsDictBatch;
+using OtlpTracesDictSchema = otlptracesdict::TracesDictBatch;
 
 std::string kInput      = "input";
 std::string kOutput     = "output";
@@ -382,7 +384,7 @@ int main(int argc, char** argv)
             kMode,
             'm',
             true,
-            "Schema mode to use. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto");
+            "Schema mode to use. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto, otlpmetricsdict, otlptracesdict");
 
     // serialize
     parser.addCommand(Cmd::SERIALIZE, "serialize", 's');
@@ -422,13 +424,13 @@ int main(int argc, char** argv)
     auto args = parser.parse(argc, argv);
 
     if (!args.globalHasFlag(kMode)) {
-        ZL_LOG(ALWAYS, "Error: --mode flag is required. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto, otlpmetricsdict");
+        ZL_LOG(ALWAYS, "Error: --mode flag is required. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto, otlpmetricsdict, otlptracesdict");
         return 1;
     }
 
     std::string mode = args.globalRequiredFlag(kMode);
-    if (mode != "otlp_metrics" && mode != "otlp_traces" && mode != "otap" && mode != "tpch_proto" && mode != "otlpmetricsdict") {
-        ZL_LOG(ALWAYS, "Error: Invalid mode '%s'. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto, otlpmetricsdict", mode.c_str());
+    if (mode != "otlp_metrics" && mode != "otlp_traces" && mode != "otap" && mode != "tpch_proto" && mode != "otlpmetricsdict" && mode != "otlptracesdict") {
+        ZL_LOG(ALWAYS, "Error: Invalid mode '%s'. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto, otlpmetricsdict, otlptracesdict", mode.c_str());
         return 1;
     }
 
@@ -490,6 +492,22 @@ int main(int argc, char** argv)
             }
             case Cmd::TRAIN: {
                 return handleTrain<OtlpMetricsDictSchema>(TrainArgs(args));
+            }
+            default: {
+                ZL_LOG(ALWAYS, "No command specified!");
+                return 1;
+            }
+        }
+    } else if (mode == "otlptracesdict") {
+        switch (args.chosenCmd()) {
+            case Cmd::SERIALIZE: {
+                return handleSerialize<OtlpTracesDictSchema>(SerializeArgs(args));
+            }
+            case Cmd::BENCHMARK: {
+                return handleBenchmark<OtlpTracesDictSchema>(BenchmarkArgs(args));
+            }
+            case Cmd::TRAIN: {
+                return handleTrain<OtlpTracesDictSchema>(TrainArgs(args));
             }
             default: {
                 ZL_LOG(ALWAYS, "No command specified!");
