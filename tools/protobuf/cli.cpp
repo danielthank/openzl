@@ -19,6 +19,7 @@
 #include "tools/protobuf/schema_otlp_traces.pb.h"
 #include "tools/protobuf/schema_otap.pb.h"
 #include "tools/protobuf/schema_tpch.pb.h"
+#include "tools/protobuf/schema_otlpmetricsdict.pb.h"
 #include "tools/training/train.h"
 #include "tools/training/train_params.h"
 
@@ -29,6 +30,7 @@ using OtlpMetricsSchema = opentelemetry::proto::collector::metrics::v1::ExportMe
 using OtlpTracesSchema = opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 using OtapSchema = opentelemetry::proto::experimental::arrow::v1::BatchArrowRecords;
 using TpchSchema = tpch::TpchBatch;
+using OtlpMetricsDictSchema = otlpdict::MetricsDictBatch;
 
 std::string kInput      = "input";
 std::string kOutput     = "output";
@@ -420,13 +422,13 @@ int main(int argc, char** argv)
     auto args = parser.parse(argc, argv);
 
     if (!args.globalHasFlag(kMode)) {
-        ZL_LOG(ALWAYS, "Error: --mode flag is required. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto");
+        ZL_LOG(ALWAYS, "Error: --mode flag is required. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto, otlpmetricsdict");
         return 1;
     }
 
     std::string mode = args.globalRequiredFlag(kMode);
-    if (mode != "otlp_metrics" && mode != "otlp_traces" && mode != "otap" && mode != "tpch_proto") {
-        ZL_LOG(ALWAYS, "Error: Invalid mode '%s'. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto", mode.c_str());
+    if (mode != "otlp_metrics" && mode != "otlp_traces" && mode != "otap" && mode != "tpch_proto" && mode != "otlpmetricsdict") {
+        ZL_LOG(ALWAYS, "Error: Invalid mode '%s'. Must be one of: otlp_metrics, otlp_traces, otap, tpch_proto, otlpmetricsdict", mode.c_str());
         return 1;
     }
 
@@ -472,6 +474,22 @@ int main(int argc, char** argv)
             }
             case Cmd::TRAIN: {
                 return handleTrain<OtapSchema>(TrainArgs(args));
+            }
+            default: {
+                ZL_LOG(ALWAYS, "No command specified!");
+                return 1;
+            }
+        }
+    } else if (mode == "otlpmetricsdict") {
+        switch (args.chosenCmd()) {
+            case Cmd::SERIALIZE: {
+                return handleSerialize<OtlpMetricsDictSchema>(SerializeArgs(args));
+            }
+            case Cmd::BENCHMARK: {
+                return handleBenchmark<OtlpMetricsDictSchema>(BenchmarkArgs(args));
+            }
+            case Cmd::TRAIN: {
+                return handleTrain<OtlpMetricsDictSchema>(TrainArgs(args));
             }
             default: {
                 ZL_LOG(ALWAYS, "No command specified!");

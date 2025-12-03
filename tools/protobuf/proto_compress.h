@@ -10,6 +10,16 @@ extern "C" {
 typedef struct ZL_ProtoSerializer ZL_ProtoSerializer;
 typedef struct ZL_ProtoDeserializer ZL_ProtoDeserializer;
 
+// ============ Schema Identifier ============
+
+typedef enum {
+    ZL_PROTO_SCHEMA_OTLP_METRICS = 0,
+    ZL_PROTO_SCHEMA_OTLP_TRACES = 1,
+    ZL_PROTO_SCHEMA_OTAP = 2,
+    ZL_PROTO_SCHEMA_TPCH = 3,
+    ZL_PROTO_SCHEMA_OTLP_METRICS_DICT = 4,
+} ZL_ProtoSchema;
+
 // ============ Error Handling ============
 
 // Get the last error message (thread-local)
@@ -31,41 +41,15 @@ ZL_ProtoSerializer* ZL_ProtoSerializer_createWithCompressor(
 
 void ZL_ProtoSerializer_free(ZL_ProtoSerializer* serializer);
 
-// Compress OTLP metrics: proto bytes -> compressed bytes
+// Compress proto bytes using schema-aware compression
 // Returns bytes written, or 0 on error
-size_t ZL_ProtoSerializer_compressOtlpMetrics(
+size_t ZL_ProtoSerializer_compress(
     ZL_ProtoSerializer* serializer,
     void* dst,
     size_t dst_capacity,
     const void* src,
-    size_t src_len);
-
-// Compress OTLP traces: proto bytes -> compressed bytes
-// Returns bytes written, or 0 on error
-size_t ZL_ProtoSerializer_compressOtlpTraces(
-    ZL_ProtoSerializer* serializer,
-    void* dst,
-    size_t dst_capacity,
-    const void* src,
-    size_t src_len);
-
-// Compress OTAP (BatchArrowRecords): proto bytes -> compressed bytes
-// Returns bytes written, or 0 on error
-size_t ZL_ProtoSerializer_compressOtap(
-    ZL_ProtoSerializer* serializer,
-    void* dst,
-    size_t dst_capacity,
-    const void* src,
-    size_t src_len);
-
-// Compress TPC-H batch: proto bytes -> compressed bytes
-// Returns bytes written, or 0 on error
-size_t ZL_ProtoSerializer_compressTpch(
-    ZL_ProtoSerializer* serializer,
-    void* dst,
-    size_t dst_capacity,
-    const void* src,
-    size_t src_len);
+    size_t src_len,
+    ZL_ProtoSchema schema);
 
 // ============ Deserializer (Decompression) ============
 
@@ -73,75 +57,26 @@ ZL_ProtoDeserializer* ZL_ProtoDeserializer_create(void);
 
 void ZL_ProtoDeserializer_free(ZL_ProtoDeserializer* deserializer);
 
-// Decompress OTLP metrics: compressed bytes -> proto bytes
+// Decompress proto bytes using schema-aware decompression
 // Returns bytes written, or 0 on error
-size_t ZL_ProtoDeserializer_decompressOtlpMetrics(
+size_t ZL_ProtoDeserializer_decompress(
     ZL_ProtoDeserializer* deserializer,
     void* dst,
     size_t dst_capacity,
     const void* src,
-    size_t src_len);
-
-// Decompress OTLP traces: compressed bytes -> proto bytes
-// Returns bytes written, or 0 on error
-size_t ZL_ProtoDeserializer_decompressOtlpTraces(
-    ZL_ProtoDeserializer* deserializer,
-    void* dst,
-    size_t dst_capacity,
-    const void* src,
-    size_t src_len);
-
-// Decompress OTAP (BatchArrowRecords): compressed bytes -> proto bytes
-// Returns bytes written, or 0 on error
-size_t ZL_ProtoDeserializer_decompressOtap(
-    ZL_ProtoDeserializer* deserializer,
-    void* dst,
-    size_t dst_capacity,
-    const void* src,
-    size_t src_len);
-
-// Decompress TPC-H batch: compressed bytes -> proto bytes
-// Returns bytes written, or 0 on error
-size_t ZL_ProtoDeserializer_decompressTpch(
-    ZL_ProtoDeserializer* deserializer,
-    void* dst,
-    size_t dst_capacity,
-    const void* src,
-    size_t src_len);
+    size_t src_len,
+    ZL_ProtoSchema schema);
 
 // ============ Message Comparison ============
 
-// Compare two OTLP metrics proto messages for semantic equality
+// Compare two proto messages for semantic equality
 // Returns 1 if equal, 0 if not equal or on error
-int ZL_Proto_compareOtlpMetrics(
+int ZL_Proto_compare(
     const void* proto1,
     size_t proto1_len,
     const void* proto2,
-    size_t proto2_len);
-
-// Compare two OTLP traces proto messages for semantic equality
-// Returns 1 if equal, 0 if not equal or on error
-int ZL_Proto_compareOtlpTraces(
-    const void* proto1,
-    size_t proto1_len,
-    const void* proto2,
-    size_t proto2_len);
-
-// Compare two OTAP (BatchArrowRecords) proto messages for semantic equality
-// Returns 1 if equal, 0 if not equal or on error
-int ZL_Proto_compareOtap(
-    const void* proto1,
-    size_t proto1_len,
-    const void* proto2,
-    size_t proto2_len);
-
-// Compare two TPC-H batch proto messages for semantic equality
-// Returns 1 if equal, 0 if not equal or on error
-int ZL_Proto_compareTpch(
-    const void* proto1,
-    size_t proto1_len,
-    const void* proto2,
-    size_t proto2_len);
+    size_t proto2_len,
+    ZL_ProtoSchema schema);
 
 #ifdef __cplusplus
 }

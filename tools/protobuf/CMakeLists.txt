@@ -39,6 +39,7 @@ if (OPENZL_BUILD_PROTOBUF_TOOLS)
             "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlp_traces.proto"
             "${CMAKE_CURRENT_SOURCE_DIR}/schema_otap.proto"
             "${CMAKE_CURRENT_SOURCE_DIR}/schema_tpch.proto"
+            "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlpmetricsdict.proto"
     )
 
     target_link_libraries(protobuf_serializer PUBLIC
@@ -54,7 +55,8 @@ if (OPENZL_BUILD_PROTOBUF_TOOLS)
         "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlp_metrics.proto"
         "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlp_traces.proto"
         "${CMAKE_CURRENT_SOURCE_DIR}/schema_otap.proto"
-        "${CMAKE_CURRENT_SOURCE_DIR}/schema_tpch.proto")
+        "${CMAKE_CURRENT_SOURCE_DIR}/schema_tpch.proto"
+        "${CMAKE_CURRENT_SOURCE_DIR}/schema_otlpmetricsdict.proto")
     add_executable(protobuf_cli ${protobuf_cli_sources})
 
     include(FindProtobuf)
